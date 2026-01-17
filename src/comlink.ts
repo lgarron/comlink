@@ -551,8 +551,9 @@ export function wrap<T>(
          * So we call it three times unconditionally (instead of once).
          */
         ep.unref?.();
-        ep.unref?.();
-        ep.unref?.();
+        // Commented out for bug repro
+        // ep.unref?.();
+        // ep.unref?.();
       }
     }
   });

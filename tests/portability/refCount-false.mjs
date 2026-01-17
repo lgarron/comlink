@@ -21,12 +21,12 @@ const timeout = setTimeout(() => {
   // This should exit the process successfully…
   worker.unref();
   // … but `deno` seems to need at least 4 more tries on some systems. 🤷
-  // https://github.com/denoland/deno/issues/31871
-  if ("Deno" in globalThis) {
-    for (let i = 0; i < 4; i++) {
-      worker.unref();
-    }
-  }
+  // Commented out for bug repro
+  // if ("Deno" in globalThis) {
+  //   for (let i = 0; i < 4; i++) {
+  //     worker.unref();
+  //   }
+  // }
 }, 100);
 timeout.unref();
 
