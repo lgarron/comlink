@@ -11,15 +11,17 @@
  * limitations under the License.
  */
 
-import * as Comlink from "/base/dist/esm/comlink.mjs";
+import * as Comlink from "/base/dist/lib/comlink/index.js";
 
-describe("Comlink across iframes", function () {
+describe("Comlink across iframes", () => {
   beforeEach(function () {
     this.ifr = document.createElement("iframe");
     this.ifr.sandbox.add("allow-scripts", "allow-same-origin");
     this.ifr.src = "/base/tests/fixtures/two-way-iframe.html";
     document.body.appendChild(this.ifr);
-    return new Promise((resolve) => (this.ifr.onload = resolve));
+    return new Promise((resolve) => {
+      this.ifr.onload = resolve;
+    });
   });
 
   afterEach(function () {

@@ -5,11 +5,9 @@ Comlink.transferHandlers.set("event", {
   serialize(obj) {
     return [
       {
-        targetId: obj && obj.target && obj.target.id,
-        targetClassList: obj &&
-          obj.target &&
-          obj.target.classList && [...obj.target.classList],
-        detail: obj && obj.detail,
+        targetId: obj?.target?.id,
+        targetClassList: obj?.target?.classList && [...obj.target.classList],
+        detail: obj?.detail,
       },
       [],
     ];

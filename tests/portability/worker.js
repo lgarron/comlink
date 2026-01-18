@@ -1,4 +1,4 @@
-import { expose } from "../../dist/esm/comlink.mjs";
+import { expose } from "../../dist/lib/comlink/index.js";
 
 const api = {
   add(a, b) {

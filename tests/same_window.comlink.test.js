@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 
-import * as Comlink from "/base/dist/esm/comlink.mjs";
+import * as Comlink from "/base/dist/lib/comlink/index.js";
 
 class SampleClass {
   constructor(counterInit = 1) {
@@ -65,7 +65,7 @@ class SampleClass {
   }
 }
 
-describe("Comlink in the same realm", function () {
+describe("Comlink in the same realm", () => {
   beforeEach(function () {
     const { port1, port2 } = new MessageChannel();
     port1.start();
@@ -124,7 +124,7 @@ describe("Comlink in the same realm", function () {
           throw new Error("Should have thrown");
         },
       },
-      this.port2
+      this.port2,
     );
     try {
       await thing.throwError();
@@ -187,7 +187,7 @@ describe("Comlink in the same realm", function () {
     const thing = Comlink.wrap(this.port1);
     Comlink.expose(
       (_) => new Promise((resolve) => setTimeout((_) => resolve(4), 100)),
-      this.port2
+      this.port2,
     );
     expect(await thing()).to.equal(4);
   });
@@ -225,6 +225,7 @@ describe("Comlink in the same realm", function () {
     Comlink.expose(SampleClass, this.port2);
     const instance = await new thing();
     expect(await instance._counter).to.equal(1);
+    // biome-ignore lint/suspicious/noAssignInExpressions: TODO
     await (instance._counter = 4);
     expect(await instance._counter).to.equal(4);
   });
@@ -245,7 +246,7 @@ describe("Comlink in the same realm", function () {
     return instance
       .throwsAnError()
       .then((_) => Promise.reject())
-      .catch((err) => {});
+      .catch((_err) => {});
   });
 
   it("can work with class instance methods multiple times", async function () {
@@ -315,6 +316,7 @@ describe("Comlink in the same realm", function () {
     Comlink.expose(SampleClass, this.port2);
     const instance = await new thing();
     expect(await instance._counter).to.equal(1);
+    // biome-ignore lint/suspicious/noAssignInExpressions: TODO
     await (instance.counter = 4);
     expect(await instance._counter).to.equal(4);
   });
@@ -322,13 +324,13 @@ describe("Comlink in the same realm", function () {
   const hasBroadcastChannel = (_) => "BroadcastChannel" in self;
   guardedIt(hasBroadcastChannel)(
     "will work with BroadcastChannel",
-    async function () {
+    async () => {
       const b1 = new BroadcastChannel("comlink_bc_test");
       const b2 = new BroadcastChannel("comlink_bc_test");
       const thing = Comlink.wrap(b1);
       Comlink.expose((b) => 40 + b, b2);
       expect(await thing(2)).to.equal(42);
-    }
+    },
   );
 
   // Buffer transfers seem to have regressed in Safari 11.1, it’s fixed in 11.2.
@@ -372,10 +374,10 @@ describe("Comlink in the same realm", function () {
       Comlink.expose((a) => a.b.c.d.byteLength, this.port2);
       const buffer = new Uint8Array([1, 2, 3]).buffer;
       expect(
-        await thing(Comlink.transfer({ b: { c: { d: buffer } } }, [buffer]))
+        await thing(Comlink.transfer({ b: { c: { d: buffer } } }, [buffer])),
       ).to.equal(3);
       expect(buffer.byteLength).to.equal(0);
-    }
+    },
   );
 
   it("will transfer a message port", async function () {
@@ -401,7 +403,7 @@ describe("Comlink in the same realm", function () {
             this.counter += 1;
           },
         }),
-      this.port2
+      this.port2,
     );
     const obj = await thing();
     expect(await obj.counter).to.equal(0);
@@ -427,7 +429,7 @@ describe("Comlink in the same realm", function () {
         this.counter++;
       },
     };
-    Comlink.expose(async function (f) {
+    Comlink.expose(async (f) => {
       await f.inc();
     }, this.port2);
     expect(local.counter).to.equal(0);
@@ -451,27 +453,28 @@ describe("Comlink in the same realm", function () {
 
   it("will wrap marked parameter values, simple function", async function () {
     const thing = Comlink.wrap(this.port1);
-    Comlink.expose(async function (f) {
+    Comlink.expose(async (f) => {
       await f();
     }, this.port2);
     // Weird code because Mocha
-    await new Promise(async (resolve) => {
+    await (async (resolve) => {
       thing(Comlink.proxy((_) => resolve()));
     });
-  });
+  })();
 
   it("will wrap multiple marked parameter values, simple function", async function () {
     const thing = Comlink.wrap(this.port1);
-    Comlink.expose(async function (f1, f2, f3) {
-      return (await f1()) + (await f2()) + (await f3());
-    }, this.port2);
+    Comlink.expose(
+      async (f1, f2, f3) => (await f1()) + (await f2()) + (await f3()),
+      this.port2,
+    );
     // Weird code because Mocha
     expect(
       await thing(
         Comlink.proxy((_) => 1),
         Comlink.proxy((_) => 2),
-        Comlink.proxy((_) => 3)
-      )
+        Comlink.proxy((_) => 3),
+      ),
     ).to.equal(6);
   });
 
@@ -491,7 +494,9 @@ describe("Comlink in the same realm", function () {
     const b = await thing.b;
     expect(await a.v).to.equal(4);
     expect(await b.v).to.equal(5);
+    // biome-ignore lint/suspicious/noAssignInExpressions: TODO
     await (a.v = 8);
+    // biome-ignore lint/suspicious/noAssignInExpressions: TODO
     await (b.v = 9);
     // Workaround for a weird scheduling inconsistency in Firefox.
     // This test failed, but not when run in isolation, and only
@@ -518,7 +523,7 @@ describe("Comlink in the same realm", function () {
           return 6;
         },
       },
-      this.port2
+      this.port2,
     );
     const { a, b, c } = Comlink.wrap(this.port1);
     expect(await a).to.equal(4);
@@ -560,7 +565,7 @@ describe("Comlink in the same realm", function () {
           return 5;
         },
       },
-      this.port2
+      this.port2,
     );
     const proxy = Comlink.wrap(this.port1);
     const otherEp = await proxy[Comlink.createEndpoint]();
@@ -588,7 +593,7 @@ describe("Comlink in the same realm", function () {
           finalized = true;
         },
       },
-      this.port2
+      this.port2,
     );
     const instance = Comlink.wrap(this.port1);
     expect(await instance.a).to.equal("thing");
@@ -610,7 +615,7 @@ describe("Comlink in the same realm", function () {
           finalized = true;
         },
       },
-      this.port2
+      this.port2,
     );
 
     let registry;
@@ -618,7 +623,7 @@ describe("Comlink in the same realm", function () {
     // set a long enough timeout to wait for a garbage collection
     this.timeout(10000);
     // promise will resolve when the proxy is garbage collected
-    await new Promise(async (resolve, reject) => {
+    await (async (resolve, _reject) => {
       registry = new FinalizationRegistry((heldValue) => {
         heldValue();
       });
@@ -626,7 +631,7 @@ describe("Comlink in the same realm", function () {
       const instance = Comlink.wrap(this.port1);
       registry.register(instance, resolve);
       expect(await instance.a).to.equal("thing");
-    });
+    })();
     // wait a beat to let the events process
     await new Promise((resolve) => setTimeout(resolve, 1));
     expect(finalized).to.be.true;

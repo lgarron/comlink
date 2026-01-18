@@ -1,7 +1,11 @@
-// import { wrap } from "https://unpkg.com/comlink@alpha/dist/esm/comlink.mjs";
-import { wrap } from "../../../dist/esm/comlink.mjs";
+import type { Worker as NodeWorker } from "node:worker_threads";
 
-function isCrossOrigin(url) {
+type WebWorkerOptions = ConstructorParameters<typeof globalThis.Worker>[1];
+type NodeWorkerOptions = ConstructorParameters<typeof NodeWorker>[1];
+
+type WorkerOptions = WebWorkerOptions & NodeWorkerOptions;
+
+function isCrossOrigin(url: string | URL) {
   if (!globalThis.location) {
     return false;
   }
@@ -10,7 +14,10 @@ function isCrossOrigin(url) {
   return scriptOrigin !== workerOrigin;
 }
 
-function constructPortableWebWorker(url, workerOptions) {
+function constructPortableWebWorker(
+  url: string | URL,
+  workerOptions?: WebWorkerOptions,
+) {
   const useTrampoline = isCrossOrigin(url);
 
   // We could use the trampoline unconditionally, but this would require adding
@@ -36,6 +43,7 @@ function constructPortableWebWorker(url, workerOptions) {
     const originalTerminate = worker.terminate.bind(worker);
     Object.defineProperty(worker, "terminate", {
       get() {
+        // @ts-expect-error: TypeScript is not powerful enough to infer that `url` is always a string in this code path.
         URL.revokeObjectURL(url);
         originalTerminate();
       },
@@ -45,7 +53,10 @@ function constructPortableWebWorker(url, workerOptions) {
   return worker;
 }
 
-function constructNodeStyleWorker(url, workerOptions) {
+function constructNodeStyleWorker(
+  url: URL | string,
+  workerOptions?: NodeWorkerOptions,
+) {
   // We could theoretically use dynamic import, but:
   //
   // - 1. There is no synchronous way to do this conditionally. We can't do it
@@ -54,7 +65,7 @@ function constructNodeStyleWorker(url, workerOptions) {
   // 2.  `.getBuiltinModule(…)` signals more clearly that these are strictly
   //      runtime dependencies.
   const { Worker: NodeWorker } = globalThis.process.getBuiltinModule(
-    "node:worker_threads"
+    "node:worker_threads",
   );
 
   // `import.meta.resolve(…)` is the recommended way to get the path to a
@@ -68,16 +79,31 @@ function constructNodeStyleWorker(url, workerOptions) {
   return new NodeWorker(url, workerOptions);
 }
 
-export function PortableWorker(url, workerOptions) {
+interface GlobalThisWithMaybeUnreffableWorker {
+  Worker?: {
+    prototype: {
+      unref?: () => void;
+    };
+  };
+}
+
+function constructPortableWorker(
+  url: string | URL,
+  workerOptions?: WorkerOptions,
+): Worker | NodeWorker {
   const hasWebWorkers = globalThis.Worker;
-  const hasBuiltinModules = globalThis.process?.getBuiltinModule;
+  const hasBuiltinModules = !!globalThis.process?.getBuiltinModule;
 
   if (hasWebWorkers && !hasBuiltinModules) {
     // Browsers
-    return constructPortableWebWorker(url, workerOptions);
+    return constructPortableWebWorker(url, workerOptions) as Worker &
+      Record<Exclude<keyof NodeWorker, keyof Worker>, undefined>;
   }
 
-  const webWorkersHaveUnref = globalThis.Worker?.prototype.unref;
+  // Note that optional chaining *should* allow us to access `.unref` rather than
+  const webWorkersHaveUnref = (
+    globalThis as GlobalThisWithMaybeUnreffableWorker
+  ).Worker?.prototype.unref;
 
   if (hasWebWorkers && hasBuiltinModules && webWorkersHaveUnref) {
     // `bun`
@@ -87,3 +113,16 @@ export function PortableWorker(url, workerOptions) {
     return constructNodeStyleWorker(url, workerOptions);
   }
 }
+
+interface PortableWorkerConstructor {
+  new (url: string | URL, workerOptions?: WorkerOptions): Worker | NodeWorker;
+}
+
+// @ts-expect-error: Type wrangling
+export const PortableWorker: PortableWorkerConstructor =
+  constructPortableWorker;
+
+/** This type is useful to cast `Worker | NodeWorker` into a type where methods like `.unref?.()` can be called. */
+export type WebWorkerOrNodeWorker =
+  | (Worker & Record<Exclude<keyof NodeWorker, keyof Worker>, undefined>)
+  | (NodeWorker & Record<Exclude<keyof Worker, keyof NodeWorker>, undefined>);

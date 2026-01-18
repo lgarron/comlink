@@ -1,0 +1,19 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: make setup
+      - run: make lint
+      - run: make build
+      - run: make test-portability-node
+      - run: make test-portability-bun
+      - run: make test-portability-deno
+      - run: make test-unit
+      - run: make test-node

@@ -5,12 +5,12 @@
  */
 
 import {
-  Endpoint,
-  EventSource,
-  Message,
+  type Endpoint,
+  type EventSource,
+  type Message,
   MessageType,
-  PostMessageWithOrigin,
-  WireValue,
+  type PostMessageWithOrigin,
+  type WireValue,
   WireValueType,
 } from "./protocol";
 export type { Endpoint };
@@ -23,6 +23,9 @@ export const finalizer = Symbol("Comlink.finalizer");
 const throwMarker = Symbol("Comlink.thrown");
 
 const REF_COUNT_BY_DEFAULT = true;
+
+// biome-ignore lint/suspicious/noExplicitAny: The API often requires us to effectively use `any`. This indicates "we really have no type for this".
+export type Any = any;
 
 /**
  * Interface of values that were marked to be proxied with `comlink.proxy()`.
@@ -57,6 +60,7 @@ type RemoteProperty<T> =
   // If the value is a method, comlink will proxy it automatically.
   // Objects are only proxied if they are marked to be proxied.
   // Otherwise, the property is converted to a Promise that resolves the cloned value.
+  // biome-ignore lint/complexity/noBannedTypes: This is a very general type.
   T extends Function | ProxyMarked ? Remote<T> : Promisify<T>;
 
 /**
@@ -68,6 +72,7 @@ type RemoteProperty<T> =
  * Note: This needs to be its own type alias, otherwise it will not distribute over unions. See
  * https://www.typescriptlang.org/docs/handbook/advanced-types.html#distributive-conditional-types
  */
+// biome-ignore lint/complexity/noBannedTypes: This is a very general type.
 type LocalProperty<T> = T extends Function | ProxyMarked
   ? Local<T>
   : Unpromisify<T>;
@@ -79,9 +84,8 @@ export type ProxyOrClone<T> = T extends ProxyMarked ? Remote<T> : T;
 /**
  * Inverse of `ProxyOrClone<T>`.
  */
-export type UnproxyOrClone<T> = T extends RemoteObject<ProxyMarked>
-  ? Local<T>
-  : T;
+export type UnproxyOrClone<T> =
+  T extends RemoteObject<ProxyMarked> ? Local<T> : T;
 
 /**
  * Takes the raw type of a remote object in the other thread and returns the type as it is visible to the local thread
@@ -157,8 +161,7 @@ export type Local<T> =
     (T extends (...args: infer TArguments) => infer TReturn
       ? (
           ...args: { [I in keyof TArguments]: ProxyOrClone<TArguments[I]> }
-        ) => // The raw function could either be sync or async, but is always proxied automatically
-        MaybePromise<UnproxyOrClone<Unpromisify<TReturn>>>
+        ) => MaybePromise<UnproxyOrClone<Unpromisify<TReturn>>> // The raw function could either be sync or async, but is always proxied automatically
       : unknown) &
     // Handle construct signature (if present)
     // The return of construct signatures is always proxied (whether marked or not)
@@ -267,7 +270,7 @@ const throwTransferHandler: TransferHandler<
     if (serialized.isError) {
       throw Object.assign(
         new Error(serialized.value.message),
-        serialized.value
+        serialized.value,
       );
     }
     throw serialized.value;
@@ -321,17 +324,9 @@ export const transferHandlers = new Map<
 ]);
 
 export interface NodeEndpoint {
-  postMessage(message: any, transfer?: any[]): void;
-  on(
-    type: string,
-    listener: EventListenerOrEventListenerObject,
-    options?: {}
-  ): void;
-  off(
-    type: string,
-    listener: EventListenerOrEventListenerObject,
-    options?: {}
-  ): void;
+  postMessage(message: Any, transfer?: Any[]): void;
+  on(type: string, listener: EventListenerOrEventListenerObject): void;
+  off(type: string, listener: EventListenerOrEventListenerObject): void;
   ref?: () => void;
   unref?: () => void;
   start?: () => void;
@@ -342,12 +337,12 @@ export interface NodeEndpoint {
 export function nodeEndpoint(rawEndpoint: NodeEndpoint): Endpoint {
   const listeners: {
     [event: string]:
-      | WeakMap<EventListenerOrEventListenerObject, any>
+      | WeakMap<EventListenerOrEventListenerObject, Any>
       | undefined;
   } = {};
   function removeEventListener(
     event: "message",
-    eh: EventListenerOrEventListenerObject
+    eh: EventListenerOrEventListenerObject,
   ) {
     const l = listeners[event]?.get(eh);
     if (!l) {
@@ -358,13 +353,13 @@ export function nodeEndpoint(rawEndpoint: NodeEndpoint): Endpoint {
   }
 
   return {
-    postMessage: rawEndpoint.postMessage.bind(rawEndpoint) as any,
+    postMessage: rawEndpoint.postMessage.bind(rawEndpoint),
     addEventListener: (
       event: "message",
       handler,
-      options?: { once: boolean }
+      options?: { once: boolean },
     ) => {
-      const listener = (data: any) => {
+      const listener = (data: Any) => {
         if (options?.once) {
           removeEventListener(event, listener);
         }
@@ -384,7 +379,7 @@ export function nodeEndpoint(rawEndpoint: NodeEndpoint): Endpoint {
     unref: unrefWorkaround(rawEndpoint),
     start: (rawEndpoint as { start?: () => void }).start?.bind(rawEndpoint),
     terminate: (rawEndpoint as { terminate?: () => void }).terminate?.bind(
-      rawEndpoint
+      rawEndpoint,
     ),
     close: (rawEndpoint as { close?: () => void }).close?.bind(rawEndpoint),
   };
@@ -402,7 +397,7 @@ function toEndpoint(endpoint: Endpoint | NodeEndpoint): Endpoint {
 
 function isAllowedOrigin(
   allowedOrigins: (string | RegExp)[],
-  origin: string
+  origin: string,
 ): boolean {
   for (const allowedOrigin of allowedOrigins) {
     if (origin === allowedOrigin || allowedOrigin === "*") {
@@ -423,9 +418,9 @@ function defaultExposeEndpoint() {
 }
 
 export function expose(
-  obj: any,
+  obj: Any,
   endpoint: Endpoint | NodeEndpoint = defaultExposeEndpoint(),
-  allowedOrigins: (string | RegExp)[] = ["*"]
+  allowedOrigins: (string | RegExp)[] = ["*"],
 ) {
   const ep = toEndpoint(endpoint);
   ep.addEventListener("message", function callback(ev: MessageEvent) {
@@ -441,7 +436,7 @@ export function expose(
       ...(ev.data as Message),
     };
     const argumentList = (ev.data.argumentList || []).map(fromWireValue);
-    let returnValue;
+    let returnValue: Any;
     try {
       const parent = path.slice(0, -1).reduce((obj, prop) => obj[prop], obj);
       const rawValue = path.reduce((obj, prop) => obj[prop], obj);
@@ -486,6 +481,7 @@ export function expose(
     } catch (value) {
       returnValue = { value, [throwMarker]: 0 };
     }
+    // TODO: `Promise.try`?
     Promise.resolve(returnValue)
       .catch((value) => {
         return { value, [throwMarker]: 0 };
@@ -495,14 +491,15 @@ export function expose(
         ep.postMessage({ ...wireValue, id }, transferables);
         if (type === MessageType.RELEASE) {
           // detach and deactivate after sending release response above.
-          ep.removeEventListener("message", callback as any);
+          ep.removeEventListener("message", callback as Any);
           closeEndPoint(ep);
           if (finalizer in obj && typeof obj[finalizer] === "function") {
             obj[finalizer]();
           }
         }
       })
-      .catch((error) => {
+      .catch((_error) => {
+        console.log(_error);
         // Send Serialization Error To Caller
         const [wireValue, transferables] = toWireValue({
           value: new TypeError("Unserializable return value"),
@@ -510,7 +507,7 @@ export function expose(
         });
         ep.postMessage({ ...wireValue, id }, transferables);
       });
-  } as any);
+  } as Any);
   ep.start?.();
 }
 
@@ -537,8 +534,8 @@ function closeEndPoint(endpoint: Endpoint) {
  */
 export function wrap<T>(
   endpoint: Endpoint | NodeEndpoint,
-  target?: any,
-  options?: { refCount: boolean }
+  target?: Any,
+  options?: { refCount: boolean },
 ): Remote<T> {
   const ep = toEndpoint(endpoint);
   const pendingListeners: PendingListenersMap = new Map();
@@ -566,7 +563,7 @@ export function wrap<T>(
     }
   });
 
-  return createProxy<T>({ endpoint: ep, pendingListeners }, [], target) as any;
+  return createProxy<T>({ endpoint: ep, pendingListeners }, [], target) as Any;
 }
 
 function throwIfProxyReleased(isReleased: boolean) {
@@ -583,17 +580,6 @@ function releaseEndpoint(epWithPendingListeners: EndpointWithPendingListeners) {
   });
 }
 
-interface FinalizationRegistry<T> {
-  new (cb: (heldValue: T) => void): FinalizationRegistry<T>;
-  register(
-    weakItem: object,
-    heldValue: T,
-    unregisterToken?: object | undefined
-  ): void;
-  unregister(unregisterToken: object): void;
-}
-declare var FinalizationRegistry: FinalizationRegistry<EndpointWithPendingListeners>;
-
 const proxyCounter = new WeakMap<EndpointWithPendingListeners, number>();
 const proxyFinalizers =
   "FinalizationRegistry" in globalThis &&
@@ -602,16 +588,16 @@ const proxyFinalizers =
       const newCount = (proxyCounter.get(epWithPendingListeners) || 0) - 1;
       proxyCounter.set(epWithPendingListeners, newCount);
       if (newCount === 0) {
-        releaseEndpoint(epWithPendingListeners).finally(() => {
+        void releaseEndpoint(epWithPendingListeners).finally(() => {
           epWithPendingListeners.pendingListeners.clear();
         });
       }
-    }
+    },
   );
 
 function registerProxy(
   proxy: object,
-  epWithPendingListeners: EndpointWithPendingListeners
+  epWithPendingListeners: EndpointWithPendingListeners,
 ) {
   const newCount = (proxyCounter.get(epWithPendingListeners) || 0) + 1;
   proxyCounter.set(epWithPendingListeners, newCount);
@@ -629,7 +615,7 @@ function unregisterProxy(proxy: object) {
 function createProxy<T>(
   epWithPendingListeners: EndpointWithPendingListeners,
   path: (string | number | symbol)[] = [],
-  target: object = function () {}
+  target: object = () => {},
 ): Remote<T> {
   let isProxyReleased = false;
   const proxy = new Proxy(target, {
@@ -638,7 +624,7 @@ function createProxy<T>(
       if (prop === releaseProxy) {
         return () => {
           unregisterProxy(proxy);
-          releaseEndpoint(epWithPendingListeners).finally(() => {
+          void releaseEndpoint(epWithPendingListeners).finally(() => {
             epWithPendingListeners.pendingListeners.clear();
           });
           isProxyReleased = true;
@@ -646,6 +632,7 @@ function createProxy<T>(
       }
       if (prop === "then") {
         if (path.length === 0) {
+          // biome-ignore lint/suspicious/noThenProperty: TODO
           return { then: () => proxy };
         }
         const r = requestResponseMessage(epWithPendingListeners, {
@@ -668,13 +655,13 @@ function createProxy<T>(
           path: [...path, prop].map((p) => p.toString()),
           value,
         },
-        transferables
-      ).then(fromWireValue) as any;
+        transferables,
+      ).then(fromWireValue) as Any;
     },
     apply(_target, _thisArg, rawArgumentList) {
       throwIfProxyReleased(isProxyReleased);
       const last = path[path.length - 1];
-      if ((last as any) === createEndpoint) {
+      if ((last as Any) === createEndpoint) {
         return requestResponseMessage(epWithPendingListeners, {
           type: MessageType.ENDPOINT,
         }).then(fromWireValue);
@@ -691,7 +678,7 @@ function createProxy<T>(
           path: path.map((p) => p.toString()),
           argumentList,
         },
-        transferables
+        transferables,
       ).then(fromWireValue);
     },
     construct(_target, rawArgumentList) {
@@ -704,47 +691,47 @@ function createProxy<T>(
           path: path.map((p) => p.toString()),
           argumentList,
         },
-        transferables
+        transferables,
       ).then(fromWireValue);
     },
   });
   registerProxy(proxy, epWithPendingListeners);
-  return proxy as any;
+  return proxy as Any;
 }
 
 function myFlat<T>(arr: (T | T[])[]): T[] {
   return Array.prototype.concat.apply([], arr);
 }
 
-function processArguments(argumentList: any[]): [WireValue[], Transferable[]] {
+function processArguments(argumentList: Any[]): [WireValue[], Transferable[]] {
   const processed = argumentList.map(toWireValue);
   return [processed.map((v) => v[0]), myFlat(processed.map((v) => v[1]))];
 }
 
-const transferCache = new WeakMap<any, Transferable[]>();
+const transferCache = new WeakMap<Any, Transferable[]>();
 export function transfer<T>(obj: T, transfers: Transferable[]): T {
   transferCache.set(obj, transfers);
   return obj;
 }
 
 export function proxy<T extends {}>(obj: T): T & ProxyMarked {
-  return Object.assign(obj, { [proxyMarker]: true }) as any;
+  return Object.assign(obj, { [proxyMarker]: true }) as Any;
 }
 
 export function windowEndpoint(
   w: PostMessageWithOrigin,
   context: EventSource = globalThis,
-  targetOrigin = "*"
+  targetOrigin = "*",
 ): Endpoint {
   return {
-    postMessage: (msg: any, transferables: Transferable[]) =>
+    postMessage: (msg: Any, transferables: Transferable[]) =>
       w.postMessage(msg, targetOrigin, transferables),
     addEventListener: context.addEventListener.bind(context),
     removeEventListener: context.removeEventListener.bind(context),
   };
 }
 
-function toWireValue(value: any): [WireValue, Transferable[]] {
+function toWireValue(value: Any): [WireValue, Transferable[]] {
   for (const [name, handler] of transferHandlers) {
     if (handler.canHandle(value)) {
       const [serializedValue, transferables] = handler.serialize(value);
@@ -767,9 +754,10 @@ function toWireValue(value: any): [WireValue, Transferable[]] {
   ];
 }
 
-function fromWireValue(value: WireValue): any {
+function fromWireValue(value: WireValue): Any {
   switch (value.type) {
     case WireValueType.HANDLER:
+      // biome-ignore lint/style/noNonNullAssertion: TODO: add an assertion?
       return transferHandlers.get(value.name)!.deserialize(value.value);
     case WireValueType.RAW:
       return value.value;
@@ -779,7 +767,7 @@ function fromWireValue(value: WireValue): any {
 function requestResponseMessage(
   epWithPendingListeners: EndpointWithPendingListeners,
   msg: Message,
-  transfers?: Transferable[]
+  transfers?: Transferable[],
 ): Promise<WireValue> {
   const ep = epWithPendingListeners.endpoint;
   const pendingListeners = epWithPendingListeners.pendingListeners;

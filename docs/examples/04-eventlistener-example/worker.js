@@ -19,8 +19,8 @@ Comlink.expose({
   onclick(ev) {
     console.log(
       `Click! Button id: ${ev.targetId}, Button classes: ${JSON.stringify(
-        ev.targetClassList
-      )}`
+        ev.targetClassList,
+      )}`,
     );
   },
 });

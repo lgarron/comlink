@@ -11,6 +11,6 @@
  * limitations under the License.
  */
 
-importScripts("/base/dist/umd/comlink.js");
+importScripts("/base/dist/lib/comlink/index.js");
 
 Comlink.expose((a, b) => a + b);

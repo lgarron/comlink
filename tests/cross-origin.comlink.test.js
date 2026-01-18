@@ -11,17 +11,17 @@
  * limitations under the License.
  */
 
-import * as Comlink from "/base/dist/esm/comlink.mjs";
+import * as Comlink from "/base/dist/lib/comlink/index.js";
 
-describe("Comlink origin filtering", function () {
-  it("rejects messages from unknown origin", async function () {
+describe("Comlink origin filtering", () => {
+  it("rejects messages from unknown origin", async () => {
     // expose on our window so comlink is listening to window postmessage
     const obj = { my: "value" };
     Comlink.expose(obj, self, [/^http:\/\/localhost(:[0-9]+)?\/?$/]);
 
     let handler;
     // juggle async timings to get the attack started
-    const attackComplete = new Promise((resolve, reject) => {
+    const attackComplete = new Promise((resolve, _reject) => {
       handler = (ev) => {
         if (ev.data === "ready" && ev.origin === "null") {
           // tell the iframe it can start the attack
@@ -41,20 +41,22 @@ describe("Comlink origin filtering", function () {
     ifr.src = "/base/tests/fixtures/attack-iframe.html";
     document.body.appendChild(ifr);
     // wait for the iframe to load
-    await new Promise((resolve) => (ifr.onload = resolve));
+    await new Promise((resolve) => {
+      ifr.onload = resolve;
+    });
     // and wait for the attack to complete
     await attackComplete;
     window.removeEventListener("message", handler);
     ifr.remove();
   });
-  it("accepts messages from matching origin", async function () {
+  it("accepts messages from matching origin", async () => {
     // expose on our window so comlink is listening to window postmessage
     const obj = { my: "value" };
     Comlink.expose(obj, self, [/^http:\/\/localhost(:[0-9]+)?\/?$/]);
 
     let handler;
     // juggle async timings to get the attack started
-    const attackComplete = new Promise((resolve, reject) => {
+    const attackComplete = new Promise((resolve, _reject) => {
       handler = (ev) => {
         if (ev.data === "ready" && ev.origin === window.origin) {
           // tell the iframe it can start the attack
@@ -74,7 +76,9 @@ describe("Comlink origin filtering", function () {
     ifr.src = "/base/tests/fixtures/attack-iframe.html";
     document.body.appendChild(ifr);
     // wait for the iframe to load
-    await new Promise((resolve) => (ifr.onload = resolve));
+    await new Promise((resolve) => {
+      ifr.onload = resolve;
+    });
     // and wait for the attack to complete
     await attackComplete;
     window.removeEventListener("message", handler);

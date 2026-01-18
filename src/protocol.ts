@@ -4,30 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Any } from "./comlink";
+
 export interface EventSource {
   addEventListener(
     type: string,
     listener: EventListenerOrEventListenerObject,
-    options?: {}
+    // biome-ignore lint/complexity/noBannedTypes: TODO
+    options?: {},
   ): void;
 
   removeEventListener(
     type: string,
     listener: EventListenerOrEventListenerObject,
-    options?: {}
+    // biome-ignore lint/complexity/noBannedTypes: TODO
+    options?: {},
   ): void;
 }
 
 export interface PostMessageWithOrigin {
   postMessage(
-    message: any,
+    message: Any,
     targetOrigin: string,
-    transfer?: Transferable[]
+    transfer?: Transferable[],
   ): void;
 }
 
 export interface Endpoint extends EventSource {
-  postMessage(message: any, transfer?: readonly Transferable[]): void;
+  postMessage(message: Any, transfer?: readonly Transferable[]): void;
   ref?: () => void;
   unref?: () => void;
   start?: () => void;
@@ -35,7 +39,7 @@ export interface Endpoint extends EventSource {
   close?: () => void;
 }
 
-export const enum WireValueType {
+export enum WireValueType {
   RAW = "RAW",
   PROXY = "PROXY",
   THROW = "THROW",
@@ -45,6 +49,7 @@ export const enum WireValueType {
 export interface RawWireValue {
   id?: string;
   type: WireValueType.RAW;
+  // biome-ignore lint/complexity/noBannedTypes: TODO
   value: {};
 }
 
@@ -59,7 +64,7 @@ export type WireValue = RawWireValue | HandlerWireValue;
 
 export type MessageID = string;
 
-export const enum MessageType {
+export enum MessageType {
   GET = "GET",
   SET = "SET",
   APPLY = "APPLY",

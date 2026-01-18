@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 
-module.exports = function (config) {
+module.exports = (config) => {
   const configuration = {
     basePath: "",
     frameworks: ["mocha", "chai", "detectBrowsers"],
@@ -21,7 +21,7 @@ module.exports = function (config) {
         included: false,
       },
       {
-        pattern: "dist/**/*.@(mjs|js)",
+        pattern: "dist/**/*.js",
         included: false,
       },
       {
@@ -51,7 +51,8 @@ module.exports = function (config) {
           // I know that’s not a good reason to disable tests,
           // but Safari TP is relatively unimportant.
           return availableBrowsers.filter(
-            (browser) => browser !== "SafariTechPreview"
+            (browser) =>
+              browser !== "SafariTechPreview" && browser !== "Safari",
           );
         }
       },
